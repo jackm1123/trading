@@ -243,7 +243,7 @@ def run_live(api):
                 time_after_open = clock.next_open - clock.timestamp
                 # We'll sell our shares just a minute after the market opens.
                 # Fix bug liquidating after buying
-                if time_after_open.seconds >= 60 and time_after_open.seconds <= 120:
+                if time_after_open.seconds >= 60 and time_after_open.seconds <= 300:
                     print('Liquidating positions.')
                     api.close_all_positions()
                 sold_today = True
@@ -252,7 +252,7 @@ def run_live(api):
             sold_today = False
             if cycle % 10 == 0:
                 print("Waiting for next market day...")
-        time.sleep(60)
+        time.sleep(30)
         cycle+=1
 
 
