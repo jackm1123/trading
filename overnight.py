@@ -194,19 +194,15 @@ def run_live(api):
         # The max stocks_to_hold is 50, so we shouldn't see more than 400
         # orders on a given day.
         orders = api.list_orders(
-            after=api_format(datetime.today() - timedelta(days=1)),
+            after=api_format(datetime.today() - timedelta(hours=12)),
             limit=400,
             status='all'
         )
         for order in orders:
-            if order.side == 'buy':
-                bought_today = True
-                # This handles an edge case where the script is restarted
-                # right before the market closes.
+            if order.side == 'sell':
                 sold_today = True
-                break
-            else:
-                sold_today = True
+            elif order.side == 'buy':
+                bought_today = True    
     except:
         # We don't have any orders, so we've obviously not done anything today.
         pass
@@ -214,12 +210,20 @@ def run_live(api):
     while True:
         # We'll wait until the market's open to do anything.
         clock = api.get_clock()
-        if clock.is_open and not bought_today:
-            if sold_today:
-                # Wait to buy
+        if clock.is_open:
+            # If i have not sold in last 12 hours, then I can liquidate.
+            # If i have, then we forget about it and move on
+            # Restarting script purposes
+            if not sold_today:
+                print('Liquidating positions.')
+                api.close_all_positions()
+            else:
+                sold_today = False
+
+            while True:
+                clock = api.get_clock()
                 time_until_close = clock.next_close - clock.timestamp
-                # We'll buy our shares a couple minutes before market close.
-                if time_until_close.seconds <= 120:
+                if time_until_close.seconds <= 120 and not bought_today:
                     print('Buying positions...')
                     portfolio_cash = float(api.get_account().cash)
                     ratings = get_ratings(
@@ -227,7 +231,6 @@ def run_live(api):
                     )
                     shares_to_buy = get_shares_to_buy(ratings, portfolio_cash)
                     for symbol in shares_to_buy:
-                        # Edge case, can't buy < 1 shares
                         if shares_to_buy[symbol] > 0:    
                             api.submit_order(
                                 symbol=symbol,
@@ -237,24 +240,16 @@ def run_live(api):
                                 time_in_force='day'
                             )
                     print('Positions bought.')
-                    bought_today = True
-            else:
-                # We need to sell our old positions before buying new ones.
-                time_after_open = clock.next_open - clock.timestamp
-                # We'll sell our shares just a minute after the market opens.
-                # Fix bug liquidating after buying
-                if time_after_open.seconds >= 60 and time_after_open.seconds <= 300:
-                    print('Liquidating positions.')
-                    api.close_all_positions()
-                sold_today = True
+                    time.sleep(150)
+                    break
+                time.sleep(30)
         else:
             bought_today = False
             sold_today = False
-            if cycle % 10 == 0:
+            if cycle % 60 == 0:
                 print("Waiting for next market day...")
-        time.sleep(30)
-        cycle+=1
-
+            time.sleep(30)
+            cycle += 1
 
 
 if __name__ == '__main__':
