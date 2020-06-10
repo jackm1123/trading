@@ -209,7 +209,16 @@ def run_live(api):
 
     while True:
         # We'll wait until the market's open to do anything.
-        clock = api.get_clock()
+        clock = ''
+        while clock == '':
+            try:
+                clock = api.get_clock()
+                break
+            except:
+                print("Connection refused by the server..")
+                print("Sleeping for 15 seconds")
+                time.sleep(15)
+                continue
         if clock.is_open:
             # If i have not sold in last 12 hours, then I can liquidate.
             # If i have, then we forget about it and move on
@@ -221,7 +230,16 @@ def run_live(api):
                 sold_today = False
 
             while True:
-                clock = api.get_clock()
+                clock = ''
+                while clock == '':
+                    try:
+                        clock = api.get_clock()
+                        break
+                    except:
+                        print("Connection refused by the server..")
+                        print("Sleeping for 15 seconds")
+                        time.sleep(15)
+                        continue
                 time_until_close = clock.next_close - clock.timestamp
                 if time_until_close.seconds <= 120 and not bought_today:
                     print('Buying positions...')
