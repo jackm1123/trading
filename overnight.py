@@ -99,11 +99,13 @@ def get_ratings(symbols, algo_time):
 def get_shares_to_buy(ratings_df, portfolio):
     total_rating = ratings_df['rating'].sum()
     shares = {}
+    prices = {}
     for _, row in ratings_df.iterrows():
         shares[row['symbol']] = int(
             row['rating'] / total_rating * portfolio / row['price']
         )
-    return shares
+        prices[row['symbol']] = int(row['price'] * 1.5) # This is used for our limit price. To prevent from skyrocketing prices and large losses
+    return shares, prices
 
 
 # Returns a string version of a timestamp compatible with the Alpaca API.
@@ -141,11 +143,10 @@ def backtest(api, days_to_test, portfolio_amount):
 
         # Get the ratings for a particular day
         ratings = get_ratings(symbols, timezone('EST').localize(calendar.date))
-        shares = get_shares_to_buy(ratings, portfolio_amount)
+        shares, prices = get_shares_to_buy(ratings, portfolio_amount)
         for _, row in ratings.iterrows():
             # "Buy" our shares on that day and subtract the cost.
             shares_to_buy = shares[row['symbol']]
-            shbt += shares_to_buy
             cost = row['price'] * shares_to_buy
             portfolio_amount -= cost
         cal_index += 1
@@ -247,15 +248,16 @@ def run_live(api):
                     ratings = get_ratings(
                         api, None
                     )
-                    shares_to_buy = get_shares_to_buy(ratings, portfolio_cash)
+                    shares_to_buy, prices = get_shares_to_buy(ratings, portfolio_cash)
                     for symbol in shares_to_buy:
                         if shares_to_buy[symbol] > 0:    
                             api.submit_order(
                                 symbol=symbol,
                                 qty=shares_to_buy[symbol],
                                 side='buy',
-                                type='market',
-                                time_in_force='day'
+                                type='limit',
+                                time_in_force='day',
+                                limit_price=prices[symbol]
                             )
                     print('Positions bought.')
                     time.sleep(150)
