@@ -144,11 +144,16 @@ def backtest(api, days_to_test, portfolio_amount):
         # Get the ratings for a particular day
         ratings = get_ratings(symbols, timezone('EST').localize(calendar.date))
         shares, prices = get_shares_to_buy(ratings, portfolio_amount)
+        v=list(shares.values())
+        k=list(shares.keys())
+        symbol = k[v.index(max(v))]
+        
         for _, row in ratings.iterrows():
+            if row['symbol'] == symbol:
             # "Buy" our shares on that day and subtract the cost.
-            shares_to_buy = shares[row['symbol']]
-            cost = row['price'] * shares_to_buy
-            portfolio_amount -= cost
+                shares_to_buy = shares[row['symbol']]
+                cost = row['price'] * shares_to_buy
+                portfolio_amount -= cost
         cal_index += 1
     # Print market (S&P500) return for the time period
     sp500_bars = api.get_barset(
@@ -249,16 +254,23 @@ def run_live(api):
                         api, None
                     )
                     shares_to_buy, prices = get_shares_to_buy(ratings, portfolio_cash)
-                    for symbol in shares_to_buy:
-                        if shares_to_buy[symbol] > 0:    
-                            api.submit_order(
-                                symbol=symbol,
-                                qty=shares_to_buy[symbol],
-                                side='buy',
-                                type='limit',
-                                time_in_force='day',
-                                limit_price=prices[symbol]
-                            )
+                    v=list(shares_to_buy.values())
+                    k=list(shares_to_buy.keys())
+                    symbol = k[v.index(max(v))]
+                    
+                    #for symbol in shares_to_buy:
+                        #if shares_to_buy[symbol] > 0:    
+                    try:    
+                        api.submit_order(
+                            symbol=symbol,
+                            qty=shares_to_buy[symbol],
+                            side='buy',
+                            type='limit',
+                            time_in_force='day',
+                            limit_price=prices[symbol]
+                        )
+                    except:
+                        print("Failed to buy ", shares_to_buy[symbol], " shares of stock ", symbol, " at price ", prices[symbol])
                     print('Positions bought.')
                     time.sleep(150)
                     break
